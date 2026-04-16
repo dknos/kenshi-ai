@@ -24,6 +24,7 @@
 #include <kenshi/PlayerInterface.h>
 #include <kenshi/Platoon.h>
 #include <kenshi/RaceData.h>
+#include <kenshi/Faction.h>
 #include <core/Functions.h>
 
 #include "kenshi_ai.h"

@@ -14,7 +14,7 @@ endif()
 
 # KenshiLib ships a pre-built static lib + headers
 find_library(KENSHILIB_LIB KenshiLib
-    PATHS "${KENSHILIB_DIR}/Lib/Release" "${KENSHILIB_DIR}/Lib"
+    PATHS "${KENSHILIB_DIR}/Lib/Release" "${KENSHILIB_DIR}/Lib" "${KENSHILIB_DIR}"
     REQUIRED
 )
 

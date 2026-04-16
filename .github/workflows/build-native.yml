@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache KenshiLib
+      - name: Cache KenshiLib headers
         id: cache-kenshilib
         uses: actions/cache@v4
         with:
@@ -30,6 +30,37 @@ jobs:
           git clone --depth=1 -b RE_Kenshi_mods `
             https://github.com/KenshiReclaimer/KenshiLib `
             native/deps/KenshiLib
+        shell: pwsh
+
+      - name: Get KenshiLib import library from RE_Kenshi release
+        run: |
+          # Download the pre-built KenshiLib.dll shipped with RE_Kenshi
+          Invoke-WebRequest `
+            -Uri "https://github.com/BFrizzleFoShizzle/RE_Kenshi/releases/download/v0.3.1/RE_Kenshi_v0.3.1_loose.zip" `
+            -OutFile "re_kenshi.zip"
+          Expand-Archive -Path "re_kenshi.zip" -DestinationPath "re_kenshi_tmp"
+          $dll = Resolve-Path "re_kenshi_tmp\install\KenshiLib.dll"
+
+          # Find MSVC tools (lib.exe / dumpbin.exe)
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsPath  = & $vswhere -latest -property installationPath
+          $vcvars  = "`"$vsPath\VC\Auxiliary\Build\vcvars64.bat`""
+
+          # Dump exports and build a .def file
+          $raw = cmd /c "$vcvars && dumpbin /exports `"$dll`""
+          $defLines = @("LIBRARY KenshiLib", "EXPORTS")
+          foreach ($line in $raw) {
+            if ($line -match '^\s+\d+\s+[0-9A-Fa-f]+\s+[0-9A-Fa-f]+\s+(\S+)') {
+              $defLines += $Matches[1]
+            }
+          }
+          $defLines | Set-Content "KenshiLib.def" -Encoding ascii
+
+          # Generate import lib next to the headers
+          New-Item -ItemType Directory -Force -Path "native\deps\KenshiLib\Lib" | Out-Null
+          cmd /c "$vcvars && lib /def:KenshiLib.def /machine:x64 /out:`"native\deps\KenshiLib\Lib\KenshiLib.lib`""
+          Write-Host "Generated import lib:"
+          Get-Item "native\deps\KenshiLib\Lib\KenshiLib.lib"
         shell: pwsh
 
       - name: Configure (x64 Release)

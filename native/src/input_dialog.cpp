@@ -1,5 +1,5 @@
 /**
- * input_dialog.cpp — Floating "Say..." input window for F9 player chat.
+ * input_dialog.cpp — Floating "Say..." input window for Insert-key player chat.
  *
  * Lives in its own thread with its own message loop.
  * Show() / submit callback are thread-safe.
@@ -21,8 +21,8 @@ static constexpr int  IDC_EDIT        = 101;
 static constexpr int  IDC_BTN         = 102;
 
 static std::atomic<HWND> g_wnd{ nullptr };
-static HWND              g_edit      = nullptr;
-static WNDPROC           g_origEdit  = nullptr;
+static HWND              g_edit     = nullptr;
+static WNDPROC           g_origEdit = nullptr;
 
 static std::mutex                       g_cbMutex;
 static std::function<void(std::string)> g_cb;
@@ -47,7 +47,6 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
     switch (msg) {
     case WM_CREATE: {
-        // Layout: [Edit 370px] [Say 64px] with 4px padding
         g_edit = CreateWindowExA(
             WS_EX_CLIENTEDGE, "EDIT", "",
             WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
@@ -57,7 +56,6 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
             WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
             376, 4, 64, 26,
             hwnd, (HMENU)(UINT_PTR)IDC_BTN, nullptr, nullptr);
-        // Subclass the Edit to intercept Enter/Escape
         g_origEdit = reinterpret_cast<WNDPROC>(
             SetWindowLongPtrA(g_edit, GWLP_WNDPROC,
                               reinterpret_cast<LONG_PTR>(EditSubclassProc)));
@@ -104,18 +102,15 @@ static void DialogThread()
     wc.lpszClassName = "KenshiAI_Input";
     RegisterClassExA(&wc);
 
-    // Position at center-bottom of primary monitor
     int sw = GetSystemMetrics(SM_CXSCREEN);
     int sh = GetSystemMetrics(SM_CYSCREEN);
     int ww = 460, wh = 56;
-    int wx = (sw - ww) / 2;
-    int wy = sh * 3 / 4;
 
     HWND hwnd = CreateWindowExA(
         WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
         "KenshiAI_Input", "Say (Enter to send, Esc to cancel)",
         WS_CAPTION | WS_SYSMENU,
-        wx, wy, ww, wh,
+        (sw - ww) / 2, sh * 3 / 4, ww, wh,
         nullptr, nullptr, GetModuleHandleA(nullptr), nullptr);
 
     g_wnd.store(hwnd, std::memory_order_release);

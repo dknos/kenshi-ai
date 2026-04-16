@@ -153,10 +153,10 @@ static void hook_dialogueUpdate(Dialogue* self, float frameTime)
 {
     orig_dialogueUpdate(self, frameTime);
 
-    // F9: open player-input dialog when this is the active conversation.
+    // Insert: open player-input dialog when this is the active conversation.
     if (self == g_activeDlg && g_activeNpc)
     {
-        bool f9Down = (GetAsyncKeyState(VK_F9) & 0x8000) != 0;
+        bool f9Down = (GetAsyncKeyState(VK_INSERT) & 0x8000) != 0;
         if (f9Down && !g_f9WasDown)
         {
             Dialogue*  dlg    = g_activeDlg;

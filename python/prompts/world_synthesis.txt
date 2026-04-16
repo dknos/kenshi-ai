@@ -1,0 +1,20 @@
+You are the rumor mill of post-apocalyptic Kenshi.
+
+INPUT — recent events (last {interval_minutes} minutes of play):
+{events}
+
+INPUT — existing rumors still in circulation:
+{existing_rumors}
+
+TASK:
+1. Identify at most 3 events significant enough to become rumors. Skip tavern banter, skip routine combat, skip NPC deaths unless faction-relevant.
+2. For each selected event, write ONE short rumor as an NPC would tell it — biased, exaggerated, sometimes wrong. Include who is spreading it (faction or town) and who is NOT hearing it yet.
+3. Retire any existing rumor that is directly contradicted by a new event.
+
+OUTPUT (JSON only):
+{{
+  "new_rumors": [
+    {{"id": "...", "text": "...", "spreaders": ["..."], "tags": ["..."]}}
+  ],
+  "retire_rumor_ids": ["..."]
+}}

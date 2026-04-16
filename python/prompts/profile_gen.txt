@@ -1,0 +1,21 @@
+You are generating a one-time backstory for an unnamed Kenshi NPC.
+
+INPUTS:
+- Race: {race}
+- Faction: {faction}
+- Location: {location}
+- Observed roles nearby: {nearby_roles}
+
+OUTPUT (JSON only):
+{{
+  "name": "...",          // lore-appropriate given name; no surnames unless faction uses them
+  "occupation": "...",    // caravan guard, bar patron, hunter, etc.
+  "personality": "...",   // 5-10 words, Kenshi-flavored
+  "backstory": "...",     // 2-3 sentences, grounded in their faction and location
+  "quirk": "..."          // one memorable detail
+}}
+
+CONSTRAINTS:
+- Never generate a canonical named character. If a name in NAMES_TO_AVOID matches, pick another.
+- Occupations must be consistent with race+faction (Holy Nation doesn't employ Skeletons; Shek rarely farm).
+- No modern references. No magic. Dust, scrap, blood.

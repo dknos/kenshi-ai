@@ -1,0 +1,39 @@
+__pycache__/
+*.pyc
+*.pyd
+*.pdb
+*.obj
+*.exp
+*.lib
+*.dll
+!mod/*.dll
+.venv/
+venv/
+env/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+
+# Runtime
+python/logs/
+python/campaigns/
+python/.providers.local.json
+
+# Secrets
+*.key
+.env
+.env.local
+providers.local.json
+
+# Native build
+native/build/
+native/out/
+
+# IDE
+.vscode/
+.idea/
+*.swp

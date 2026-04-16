@@ -1,0 +1,22 @@
+{
+    "Grok-4": {
+        "provider": "xai",
+        "model": "grok-4"
+    },
+    "Grok-4-Fast": {
+        "provider": "xai",
+        "model": "grok-4-fast"
+    },
+    "Claude-Haiku-4.5": {
+        "provider": "openrouter",
+        "model": "anthropic/claude-haiku-4.5"
+    },
+    "DeepSeek-v3.2": {
+        "provider": "openrouter",
+        "model": "deepseek/deepseek-v3.2"
+    },
+    "Local-Llama3-8B": {
+        "provider": "ollama_local",
+        "model": "llama3:8b-instruct"
+    }
+}

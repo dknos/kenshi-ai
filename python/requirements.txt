@@ -1,0 +1,8 @@
+fastapi>=0.115
+uvicorn[standard]>=0.32
+httpx>=0.28
+pydantic>=2.9
+tenacity>=9.0
+qdrant-client>=1.12
+pyyaml>=6.0
+python-dotenv>=1.0

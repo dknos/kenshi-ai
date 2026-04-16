@@ -338,8 +338,13 @@ namespace Hooks
             (void**)&orig_startPlayerConversation
         );
 
+        // RVA 0x684910 from KenshiLib/Include/kenshi/Dialogue.h (1.0.65).
+        // GetRealAddress(&Dialogue::update) triggers a FUNC_BEGIN/FUNC_END
+        // assertion failure during preload — use the raw RVA instead.
+        void* updateAddr = reinterpret_cast<void*>(
+            reinterpret_cast<uintptr_t>(GetModuleHandleA("kenshi_x64.exe")) + 0x684910);
         KenshiLib::AddHook(
-            KenshiLib::GetRealAddress(&Dialogue::update),
+            updateAddr,
             (void*)hook_dialogueUpdate,
             (void**)&orig_dialogueUpdate
         );

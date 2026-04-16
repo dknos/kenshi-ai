@@ -1,0 +1,50 @@
+name: Build native DLL (MSVC x64)
+
+on:
+  push:
+    paths:
+      - 'native/**'
+      - '.github/workflows/build-native.yml'
+  pull_request:
+    paths:
+      - 'native/**'
+      - '.github/workflows/build-native.yml'
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache KenshiLib
+        id: cache-kenshilib
+        uses: actions/cache@v4
+        with:
+          path: native/deps/KenshiLib
+          key: kenshilib-RE_Kenshi_mods-${{ hashFiles('.github/workflows/build-native.yml') }}
+
+      - name: Clone KenshiLib
+        if: steps.cache-kenshilib.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth=1 -b RE_Kenshi_mods `
+            https://github.com/KenshiReclaimer/KenshiLib `
+            native/deps/KenshiLib
+        shell: pwsh
+
+      - name: Configure (x64 Release)
+        run: |
+          cmake -B native/build -S native -A x64 `
+            -DCMAKE_BUILD_TYPE=Release
+        shell: pwsh
+
+      - name: Build
+        run: cmake --build native/build --config Release
+        shell: pwsh
+
+      - name: Upload DLL artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kenshi_ai-dll
+          path: native/build/Release/kenshi_ai.dll
+          if-no-files-found: error

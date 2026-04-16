@@ -25,34 +25,38 @@ namespace Hooks
     void Init();
 }
 
-// RE_Kenshi reads this exact mangled export to start the plugin.
-extern "C" __declspec(dllexport) void startPlugin()
+// Captured in DllMain so startPlugin doesn't need to scan activeMods.
+static std::string g_modFolder;
+
+// RE_Kenshi calls GetProcAddress(hDll, "?startPlugin@@YAXXZ").
+// Do NOT use extern "C" here — that would export as plain "startPlugin".
+__declspec(dllexport) void startPlugin()
 {
-    // Find this mod's folder so we can load kenshi_ai.ini and config/
-    std::string modFolder;
-    lektor<ModInfo*>& mods = ou->activeMods;
-    for (int i = 0; i < mods.size(); ++i)
+    if (FILE* f = fopen("C:\\Users\\Public\\kenshi_ai_start.txt", "w"))
     {
-        // Our mod has RE_Kenshi.json with "Plugins": ["kenshi_ai.dll"]
-        std::string candidate = mods[i]->path + "\\kenshi_ai.dll";
-        if (GetFileAttributesA(candidate.c_str()) != INVALID_FILE_ATTRIBUTES)
-        {
-            modFolder = mods[i]->path;
-            break;
-        }
+        fprintf(f, "startPlugin called\nmodFolder=%s\n", g_modFolder.c_str());
+        fclose(f);
     }
 
-    KenshiAI::LoadConfig(modFolder);
+    KenshiAI::LoadConfig(g_modFolder);
     Hooks::Init();
 }
 
-BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID)
+BOOL WINAPI DllMain(HINSTANCE hInst, DWORD reason, LPVOID)
 {
     if (reason == DLL_PROCESS_ATTACH)
     {
+        char path[MAX_PATH] = {};
+        GetModuleFileNameA(hInst, path, MAX_PATH);
+        // Strip "kenshi_ai.dll" to get the mod folder.
+        std::string p(path);
+        auto slash = p.find_last_of("\\/");
+        g_modFolder = (slash != std::string::npos) ? p.substr(0, slash) : p;
+
         if (FILE* f = fopen("C:\\Users\\Public\\kenshi_ai_load.txt", "w"))
         {
-            fprintf(f, "kenshi_ai.dll DLL_PROCESS_ATTACH\n");
+            fprintf(f, "kenshi_ai.dll DLL_PROCESS_ATTACH\nmodFolder=%s\n",
+                    g_modFolder.c_str());
             fclose(f);
         }
     }

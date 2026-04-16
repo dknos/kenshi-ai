@@ -1,0 +1,12 @@
+# kenshi-ai configuration
+# Copy to: Kenshi/mods/kenshi-ai/kenshi_ai.ini
+
+[Settings]
+server_url              = http://127.0.0.1:9392
+timeout_ms              = 30000
+default_model           = Grok-4-Fast
+campaign_id             = Default
+talk_radius             = 100
+proximity_radius        = 200
+radiant_delay_s         = 240
+synthesis_interval_minutes = 5

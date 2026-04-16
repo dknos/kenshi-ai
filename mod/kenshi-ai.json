@@ -1,0 +1,5 @@
+{
+    "Plugins": [
+        "kenshi_ai.dll"
+    ]
+}

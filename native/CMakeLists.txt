@@ -43,6 +43,9 @@ target_compile_definitions(kenshi_ai PRIVATE
     WIN32_LEAN_AND_MEAN
     UNICODE
     _UNICODE
+    # Fix OgreString.h: MSVC >= VC10 branch uses removed std::tr1::hash.
+    # STLPORT skips that branch; _STLP_HASH_FUN_H then selects std::hash.
+    STLPORT
     _STLP_HASH_FUN_H
 )
 

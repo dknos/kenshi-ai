@@ -13,6 +13,7 @@
 #include <kenshi/PlayerInterface.h>
 #include <kenshi/Faction.h>
 #include <kenshi/FactionRelations.h>
+#include <kenshi/Platoon.h>
 
 #include "kenshi_ai.h"
 
@@ -40,7 +41,7 @@ namespace
     DoActionsFunc GetDoActions()
     {
         static DoActionsFunc fn = reinterpret_cast<DoActionsFunc>(
-            reinterpret_cast<uintptr_t>(GetModuleHandle("kenshi_x64.exe")) + 0x67FDE0);
+            reinterpret_cast<uintptr_t>(GetModuleHandleA("kenshi_x64.exe")) + 0x67FDE0);
         return fn;
     }
 
@@ -55,7 +56,7 @@ namespace
         alignas(16) char buf[0x280] = {};
         *reinterpret_cast<uint32_t*>(buf + 0x208) = 1;
         *reinterpret_cast<uint32_t*>(buf + 0x20C) = 1;
-        *reinterpret_cast<RawAction**>(buf + 0x210) = &pEntry;
+        *reinterpret_cast<RawAction***>(buf + 0x210) = &pEntry;
 
         GetDoActions()(dlg, buf);
     }
@@ -175,7 +176,9 @@ namespace Actions
         // ── faction_relation_delta ────────────────────────────────────────────
         if (resp.factionRelDelta != 0)
         {
-            Faction* npcFaction    = npc->getPlatoon() ? npc->getPlatoon()->getFaction() : nullptr;
+            // getPlatoon() returns ActivePlatoon*; getFaction() is on Platoon (RootObjectBase)
+            Faction* npcFaction    = (npc->getPlatoon() && npc->getPlatoon()->me)
+                                     ? npc->getPlatoon()->me->getFaction() : nullptr;
             Faction* playerFaction = (ou && ou->player) ? ou->player->getFaction() : nullptr;
             // Faction::relations is the FactionRelations* at offset 0x78 (Faction.h)
             if (npcFaction && playerFaction && npcFaction->relations)

@@ -187,12 +187,16 @@ static void hook_dialogueUpdate(Dialogue* self, float frameTime)
             std::string npcBId   = std::to_string(reinterpret_cast<uintptr_t>(b.chr));
             std::string npcAName = a.chr->getName();
             std::string npcBName = b.chr->getName();
-            std::string npcARace = a.chr->getRace() ? a.chr->getRace()->name : "Unknown";
-            std::string npcBRace = b.chr->getRace() ? b.chr->getRace()->name : "Unknown";
-            std::string npcAFac  = (a.chr->getPlatoon() && a.chr->getPlatoon()->getFaction())
-                                    ? a.chr->getPlatoon()->getFaction()->getName() : "";
-            std::string npcBFac  = (b.chr->getPlatoon() && b.chr->getPlatoon()->getFaction())
-                                    ? b.chr->getPlatoon()->getFaction()->getName() : "";
+            // RaceData has no name field; getFaction via ActivePlatoon::me (RootObjectBase)
+            std::string npcARace = "Unknown";
+            std::string npcBRace = "Unknown";
+            auto getFac = [](Character* c) -> std::string {
+                if (!c || !c->getPlatoon() || !c->getPlatoon()->me) return "";
+                Faction* f = c->getPlatoon()->me->getFaction();
+                return f ? f->getName() : "";
+            };
+            std::string npcAFac  = getFac(a.chr);
+            std::string npcBFac  = getFac(b.chr);
 
             std::ostringstream j;
             j << "{"
@@ -265,7 +269,7 @@ namespace Hooks
         // syntax won't compile outside the class.  Use the known RVA instead.
         // RVA 0x683BA0 from KenshiLib/Include/kenshi/Dialogue.h.
         void* spcAddr = reinterpret_cast<void*>(
-            reinterpret_cast<uintptr_t>(GetModuleHandle("kenshi_x64.exe")) + 0x683BA0);
+            reinterpret_cast<uintptr_t>(GetModuleHandleA("kenshi_x64.exe")) + 0x683BA0);
 
         KenshiLib::AddHook(
             spcAddr,

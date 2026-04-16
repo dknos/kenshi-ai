@@ -12,6 +12,7 @@
 #include <kenshi/FactionRelations.h>
 #include <kenshi/Globals.h>
 #include <kenshi/GameWorld.h>
+#include <kenshi/Platoon.h>
 
 #include "kenshi_ai.h"
 
@@ -36,6 +37,15 @@ static std::string jsonEscape(const std::string& s)
 
 namespace State
 {
+    // getFaction via ActivePlatoon->me (Platoon inherits RootObjectBase::getFaction)
+    static Faction* getFactionOf(Character* c)
+    {
+        if (!c) return nullptr;
+        ActivePlatoon* ap = c->getPlatoon();
+        if (!ap || !ap->me) return nullptr;
+        return ap->me->getFaction();
+    }
+
     std::string BuildChatRequest(Character* npc, Character* player,
                                  const std::string& playerMessage)
     {
@@ -43,47 +53,31 @@ namespace State
 
         // ── NPC fields ─────────────────────────────────────────────────────
         std::string npcId   = std::to_string(reinterpret_cast<uintptr_t>(npc));
-        std::string npcName = npc->getName();   // GameData name lookup
+        std::string npcName = npc->getName();
 
-        std::string race    = "Unknown";
-        std::string faction = "";
+        // Race: KenshiLib RaceData has no direct name field; skip for now
+        std::string race = "Unknown";
 
-        if (npc->getRace())
-            race = npc->getRace()->name;
+        std::string faction;
+        if (Faction* f = getFactionOf(npc))
+            faction = f->getName();
 
-        // Faction lives on the platoon, not directly on Character.
-        if (npc->getPlatoon() && npc->getPlatoon()->getFaction())
-            faction = npc->getPlatoon()->getFaction()->getName();
-
-        // Health and hunger (0.0 – 1.0)
+        // Health: CharStats doesn't expose raw HP (it's per-limb in MedicalSystem).
+        // Use wantsToEatNow() as a proxy for hunger.
         float healthFrac = 1.0f;
-        float hungerFrac = 0.0f;
-        if (npc->stats)
-        {
-            float maxHp = npc->stats->getMaxHP();
-            if (maxHp > 0.f)
-                healthFrac = std::clamp(npc->stats->getHP() / maxHp, 0.f, 1.f);
-            // CharStats has no raw hunger float; Character::wantsToEatNow() is
-            // the only accessible hunger indicator from KenshiLib headers.
-            hungerFrac = npc->wantsToEatNow() ? 1.0f : 0.0f;
-        }
+        float hungerFrac = npc->wantsToEatNow() ? 1.0f : 0.0f;
 
         // ── Player fields ──────────────────────────────────────────────────
         std::string playerFaction;
         int playerFactionRel = 0;
 
-        if (player && player->getPlatoon() && player->getPlatoon()->getFaction())
-            playerFaction = player->getPlatoon()->getFaction()->getName();
-
+        if (player)
         {
-            Faction* npcFaction    = npc->getPlatoon()    ? npc->getPlatoon()->getFaction()    : nullptr;
-            Faction* playerFactionPtr = (player && player->getPlatoon()) ? player->getPlatoon()->getFaction() : nullptr;
-            if (npcFaction && playerFactionPtr)
-            {
-                playerFactionRel = static_cast<int>(
-                    npcFaction->getRelationsTowards(playerFactionPtr));
-                playerFactionRel = std::clamp(playerFactionRel, -100, 100);
-            }
+            if (Faction* pf = getFactionOf(player))
+                playerFaction = pf->getName();
+
+            // FactionRelations::getRelationData(Faction*) returns RelationData* —
+            // skip relation value for now; sidecar tracks it in memory instead.
         }
 
         int opinion = KenshiAI::GetOpinion(reinterpret_cast<uintptr_t>(npc));

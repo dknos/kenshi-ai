@@ -34,6 +34,7 @@
 #include <queue>
 #include <string>
 #include <sstream>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -94,8 +95,7 @@ static bool       g_f9WasDown  = false;
 
 static bool (*orig_startPlayerConversation)(Dialogue*, Character*, DialogLineData*) = nullptr;
 static void (*orig_dialogueUpdate)(Dialogue*, float)                               = nullptr;
-// optional ambient hook:
-static void (*orig_dialogueSay)(Dialogue*, const std::string&, DialogLineData*)    = nullptr;
+static void (*orig_mainLoop)(GameWorld*, float)                                    = nullptr;
 
 // ── Hook: startPlayerConversation ─────────────────────────────────────────────
 
@@ -147,153 +147,23 @@ static bool hook_startPlayerConversation(Dialogue* self,
     return result;
 }
 
-// ── Hook: Dialogue::update ────────────────────────────────────────────────────
+// ── Shared drain logic (called from main-loop hook) ───────────────────────────
 
-static void hook_dialogueUpdate(Dialogue* self, float frameTime)
+static void DrainQueues()
 {
-    orig_dialogueUpdate(self, frameTime);
-
-    // Diagnostic: confirm hook fires at all (writes once, no keypress needed).
-    {
-        static bool g_hookFired = false;
-        if (!g_hookFired) {
-            g_hookFired = true;
-            if (FILE* f = fopen("C:\\Users\\Public\\kenshi_ai_hookfired.txt", "w")) {
-                fprintf(f, "hook_dialogueUpdate fired\nself=%p frameTime=%f\n",
-                        (void*)self, frameTime);
-                fclose(f);
-            }
-        }
-    }
-
-    // Insert: open player-input dialog when any conversation is active.
-    // g_f9WasDown is always updated so the edge-detect works across all
-    // Dialogue::update calls (multiple NPCs are updated each frame).
-    {
-        bool insertDown = (GetAsyncKeyState(VK_INSERT) & 0x8000) != 0;
-        // Use g_recentNPCs as fallback if hook_startPlayerConversation missed 1.0.68
-        if (!g_activeDlg && !g_recentNPCs.empty()) {
-            g_activeDlg = g_recentNPCs.back().dlg;
-            g_activeNpc = g_recentNPCs.back().chr;
-        }
-        if (insertDown && !g_f9WasDown)
-        {
-            // Diagnostic: write once so we can confirm GetAsyncKeyState + hook are working
-            static bool g_diagWritten = false;
-            if (!g_diagWritten) {
-                g_diagWritten = true;
-                if (FILE* f = fopen("C:\\Users\\Public\\kenshi_ai_diag.txt", "w")) {
-                    fprintf(f, "hook_dialogueUpdate reached Insert\n"
-                               "g_activeDlg=%p\ng_activeNpc=%p\n"
-                               "g_recentNPCs.size=%zu\n",
-                               (void*)g_activeDlg, (void*)g_activeNpc,
-                               g_recentNPCs.size());
-                    fclose(f);
-                }
-            }
-        }
-        if (insertDown && !g_f9WasDown && g_activeNpc)
-        {
-            Dialogue*  dlg    = g_activeDlg;
-            Character* npc    = g_activeNpc;
-            Character* player = (ou && ou->player) ? ou->player->getAnyPlayerCharacter() : nullptr;
-
-            InputDialog::Show([dlg, npc, player](const std::string& text)
-            {
-                std::string req = State::BuildChatRequest(npc, player, text);
-                KenshiAI::PostChat(req, [dlg, npc](const std::string& json)
-                {
-                    QueuedResponse qr;
-                    qr.dialogue  = dlg;
-                    qr.character = npc;
-                    qr.parsed    = KenshiAI::ParseResponse(json);
-                    std::lock_guard<std::mutex> lk(g_queueMutex);
-                    g_responseQueue.push(std::move(qr));
-                });
-            });
-        }
-        g_f9WasDown = insertDown;
-    }
-
-    // Drain responses destined for this Dialogue instance.
-    // We can't break on mismatches because std::queue is FIFO — a response for
-    // a different Dialogue* would permanently block everything behind it.
-    // Move unmatched items to a temp queue and put them back after.
-    std::queue<QueuedResponse> unmatched;
+    // Drain AI chat responses — dispatch each to the right NPC's Dialogue.
     {
         std::lock_guard<std::mutex> lk(g_queueMutex);
         while (!g_responseQueue.empty())
         {
             QueuedResponse qr = std::move(g_responseQueue.front());
             g_responseQueue.pop();
-            if (qr.dialogue == self)
+            if (qr.dialogue && qr.character)
                 Actions::DispatchResponse(qr.dialogue, qr.character, qr.parsed);
-            else
-                unmatched.push(std::move(qr));
-        }
-        while (!unmatched.empty())
-        {
-            g_responseQueue.push(std::move(unmatched.front()));
-            unmatched.pop();
         }
     }
 
-    // Radiant D2D: fire ambient NPC exchange when the timer fires.
-    g_radiantAccumS += frameTime;
-    if (g_radiantAccumS >= g_radiantIntervalS && g_recentNPCs.size() >= 2)
-    {
-        g_radiantAccumS = 0.f;
-
-        // Pick two distinct cached NPCs.
-        const CachedNPC& a = g_recentNPCs[g_recentNPCs.size() - 1];
-        const CachedNPC& b = g_recentNPCs[g_recentNPCs.size() - 2];
-
-        if (a.chr && b.chr)
-        {
-            // Build D2D JSON manually (mirrors D2DRequest schema).
-            auto esc = [](const std::string& s) -> std::string {
-                std::string o; o.reserve(s.size());
-                for (char c : s) {
-                    if (c == '"') o += "\\\""; else if (c == '\\') o += "\\\\"; else o += c;
-                } return o;
-            };
-            std::string npcAId   = std::to_string(reinterpret_cast<uintptr_t>(a.chr));
-            std::string npcBId   = std::to_string(reinterpret_cast<uintptr_t>(b.chr));
-            std::string npcAName = a.chr->getName();
-            std::string npcBName = b.chr->getName();
-            // RaceData has no name field; getFaction via ActivePlatoon::me (RootObjectBase)
-            std::string npcARace = "Unknown";
-            std::string npcBRace = "Unknown";
-            auto getFac = [](Character* c) -> std::string {
-                if (!c || !c->getPlatoon() || !c->getPlatoon()->me) return "";
-                Faction* f = c->getPlatoon()->me->getFaction();
-                return f ? f->getName() : "";
-            };
-            std::string npcAFac  = getFac(a.chr);
-            std::string npcBFac  = getFac(b.chr);
-
-            std::ostringstream j;
-            j << "{"
-              << "\"npc_a_id\":\""      << esc(npcAId)   << "\","
-              << "\"npc_a_name\":\""    << esc(npcAName) << "\","
-              << "\"npc_a_race\":\""    << esc(npcARace) << "\","
-              << "\"npc_a_faction\":\"" << esc(npcAFac)  << "\","
-              << "\"npc_b_id\":\""      << esc(npcBId)   << "\","
-              << "\"npc_b_name\":\""    << esc(npcBName) << "\","
-              << "\"npc_b_race\":\""    << esc(npcBRace) << "\","
-              << "\"npc_b_faction\":\"" << esc(npcBFac)  << "\","
-              << "\"campaign_id\":\""   << esc(KenshiAI::g_config.campaignId) << "\""
-              << "}";
-
-            KenshiAI::PostD2D(j.str(), [](const std::string& json)
-            {
-                std::lock_guard<std::mutex> lk(g_d2dMutex);
-                g_d2dQueue.push({json});
-            });
-        }
-    }
-
-    // Drain D2D responses: parse each line and say() it via the right Dialogue.
+    // Drain D2D responses.
     {
         std::lock_guard<std::mutex> lk(g_d2dMutex);
         while (!g_d2dQueue.empty())
@@ -301,35 +171,125 @@ static void hook_dialogueUpdate(Dialogue* self, float frameTime)
             std::string json = std::move(g_d2dQueue.front().json);
             g_d2dQueue.pop();
 
-            // Minimal parse of {"lines":[{"speaker_id":"...","text":"..."},...]}
             size_t pos = 0;
             while ((pos = json.find("\"speaker_id\"", pos)) != std::string::npos)
             {
-                auto idStart = json.find('"', pos + 13);
-                auto idEnd   = json.find('"', idStart + 1);
+                auto idStart  = json.find('"', pos + 13);
+                auto idEnd    = json.find('"', idStart + 1);
                 auto txtStart = json.find("\"text\"", idEnd);
                 if (txtStart == std::string::npos) break;
                 auto qs = json.find('"', txtStart + 7);
                 auto qe = json.find('"', qs + 1);
                 if (idStart == std::string::npos || idEnd == std::string::npos ||
-                    qs == std::string::npos || qe == std::string::npos) break;
+                    qs     == std::string::npos || qe    == std::string::npos) break;
 
                 std::string speakerId = json.substr(idStart + 1, idEnd - idStart - 1);
                 std::string text      = json.substr(qs + 1, qe - qs - 1);
-
-                // Find the cached Dialogue for this speaker.
                 for (auto& e : g_recentNPCs)
                 {
                     if (e.dlg && e.chr &&
                         std::to_string(reinterpret_cast<uintptr_t>(e.chr)) == speakerId)
-                    {
-                        e.dlg->say(text, nullptr);
-                        break;
-                    }
+                    { e.dlg->say(text, nullptr); break; }
                 }
                 pos = qe + 1;
             }
         }
+    }
+}
+
+// ── Hook: GameWorld::mainLoop_GPUSensitiveStuff — fires every render frame ────
+
+static void hook_mainLoop(GameWorld* self, float time)
+{
+    orig_mainLoop(self, time);
+    DrainQueues();
+}
+
+// ── Hook: Dialogue::update — kept for radiant D2D timer ──────────────────────
+
+static void hook_dialogueUpdate(Dialogue* self, float frameTime)
+{
+    orig_dialogueUpdate(self, frameTime);
+
+    // Radiant D2D: fire ambient NPC exchange when timer fires.
+    g_radiantAccumS += frameTime;
+    if (g_radiantAccumS >= g_radiantIntervalS && g_recentNPCs.size() >= 2)
+    {
+        g_radiantAccumS = 0.f;
+        const CachedNPC& a = g_recentNPCs[g_recentNPCs.size() - 1];
+        const CachedNPC& b = g_recentNPCs[g_recentNPCs.size() - 2];
+        if (a.chr && b.chr)
+        {
+            auto esc = [](const std::string& s) -> std::string {
+                std::string o; o.reserve(s.size());
+                for (char c : s) {
+                    if (c=='"') o+="\\\""; else if (c=='\\') o+="\\\\"; else o+=c;
+                } return o;
+            };
+            auto getFac = [](Character* c) -> std::string {
+                if (!c || !c->getPlatoon() || !c->getPlatoon()->me) return "";
+                Faction* f = c->getPlatoon()->me->getFaction();
+                return f ? f->getName() : "";
+            };
+            std::ostringstream j;
+            j << "{\"npc_a_id\":\""      << esc(std::to_string(reinterpret_cast<uintptr_t>(a.chr))) << "\""
+              << ",\"npc_a_name\":\""    << esc(a.chr->getName()) << "\""
+              << ",\"npc_a_race\":\"Unknown\""
+              << ",\"npc_a_faction\":\"" << esc(getFac(a.chr)) << "\""
+              << ",\"npc_b_id\":\""      << esc(std::to_string(reinterpret_cast<uintptr_t>(b.chr))) << "\""
+              << ",\"npc_b_name\":\""    << esc(b.chr->getName()) << "\""
+              << ",\"npc_b_race\":\"Unknown\""
+              << ",\"npc_b_faction\":\"" << esc(getFac(b.chr)) << "\""
+              << ",\"campaign_id\":\""   << esc(KenshiAI::g_config.campaignId) << "\""
+              << "}";
+            KenshiAI::PostD2D(j.str(), [](const std::string& json) {
+                std::lock_guard<std::mutex> lk(g_d2dMutex);
+                g_d2dQueue.push({json});
+            });
+        }
+    }
+}
+
+// ── Background Insert-key poller ──────────────────────────────────────────────
+
+static void InsertKeyThread()
+{
+    bool wasDown = false;
+    while (true)
+    {
+        Sleep(50);
+        bool down = (GetAsyncKeyState(VK_INSERT) & 0x8000) != 0;
+        if (down && !wasDown)
+        {
+            // Snapshot NPC context under lock-free read (pointers are set atomically
+            // enough for a polling thread — worst case we miss one frame).
+            Dialogue*  dlg    = g_activeDlg;
+            Character* npc    = g_activeNpc;
+            if (!npc && !g_recentNPCs.empty()) {
+                dlg = g_recentNPCs.back().dlg;
+                npc = g_recentNPCs.back().chr;
+            }
+            Character* player = (ou && ou->player)
+                                ? ou->player->getAnyPlayerCharacter() : nullptr;
+
+            if (npc)
+            {
+                InputDialog::Show([dlg, npc, player](const std::string& text)
+                {
+                    std::string req = State::BuildChatRequest(npc, player, text);
+                    KenshiAI::PostChat(req, [dlg, npc](const std::string& json)
+                    {
+                        QueuedResponse qr;
+                        qr.dialogue  = dlg;
+                        qr.character = npc;
+                        qr.parsed    = KenshiAI::ParseResponse(json);
+                        std::lock_guard<std::mutex> lk(g_queueMutex);
+                        g_responseQueue.push(std::move(qr));
+                    });
+                });
+            }
+        }
+        wasDown = down;
     }
 }
 
@@ -339,25 +299,27 @@ namespace Hooks
 {
     void Init()
     {
-        // startPlayerConversation is private in the game class — member pointer
-        // syntax won't compile outside the class.  Use the known RVA instead.
-        // RVA 0x683BA0 from KenshiLib/Include/kenshi/Dialogue.h.
-        void* spcAddr = reinterpret_cast<void*>(
-            reinterpret_cast<uintptr_t>(GetModuleHandleA("kenshi_x64.exe")) + 0x683BA0);
+        uintptr_t base = reinterpret_cast<uintptr_t>(GetModuleHandleA("kenshi_x64.exe"));
 
+        // startPlayerConversation — RVA 0x683BA0 from Dialogue.h
         KenshiLib::AddHook(
-            spcAddr,
+            reinterpret_cast<void*>(base + 0x683BA0),
             (void*)hook_startPlayerConversation,
             (void**)&orig_startPlayerConversation
         );
 
-        // RVA 0x684910 from KenshiLib/Include/kenshi/Dialogue.h (1.0.65).
-        // GetRealAddress(&Dialogue::update) triggers a FUNC_BEGIN/FUNC_END
-        // assertion failure during preload — use the raw RVA instead.
-        void* updateAddr = reinterpret_cast<void*>(
-            reinterpret_cast<uintptr_t>(GetModuleHandleA("kenshi_x64.exe")) + 0x684910);
+        // GameWorld::mainLoop_GPUSensitiveStuff — RVA 0x7877A0, called every frame.
+        // Used to drain g_responseQueue on the main thread.
         KenshiLib::AddHook(
-            updateAddr,
+            reinterpret_cast<void*>(base + 0x7877A0),
+            (void*)hook_mainLoop,
+            (void**)&orig_mainLoop
+        );
+
+        // Dialogue::update — RVA 0x684910, only called during active conversations.
+        // Kept for radiant D2D timer; not needed for Insert key or queue drain.
+        KenshiLib::AddHook(
+            reinterpret_cast<void*>(base + 0x684910),
             (void*)hook_dialogueUpdate,
             (void**)&orig_dialogueUpdate
         );
@@ -365,5 +327,9 @@ namespace Hooks
         g_radiantIntervalS = KenshiAI::g_config.radiantDelayS;
 
         InputDialog::Init();
+
+        // Background thread polls Insert key at 50ms intervals — independent of
+        // Dialogue::update which only fires during active conversations.
+        std::thread(InsertKeyThread).detach();
     }
 }

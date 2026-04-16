@@ -153,6 +153,19 @@ static void hook_dialogueUpdate(Dialogue* self, float frameTime)
 {
     orig_dialogueUpdate(self, frameTime);
 
+    // Diagnostic: confirm hook fires at all (writes once, no keypress needed).
+    {
+        static bool g_hookFired = false;
+        if (!g_hookFired) {
+            g_hookFired = true;
+            if (FILE* f = fopen("C:\\Users\\Public\\kenshi_ai_hookfired.txt", "w")) {
+                fprintf(f, "hook_dialogueUpdate fired\nself=%p frameTime=%f\n",
+                        (void*)self, frameTime);
+                fclose(f);
+            }
+        }
+    }
+
     // Insert: open player-input dialog when any conversation is active.
     // g_f9WasDown is always updated so the edge-detect works across all
     // Dialogue::update calls (multiple NPCs are updated each frame).

@@ -65,15 +65,19 @@ class ChatAgent:
 
         recalled = await self.memory.recall(req.npc_id, req.message, k=6)
         memory_block = "\n".join(f"- [{t.role}] {t.text}" for t in recalled) or "(none)"
-        system = self._system_tmpl.format(
-            npc_name=req.npc_name,
-            race=req.race,
-            faction=req.faction or "unaffiliated",
-            player_faction_rel=req.player_faction_rel,
-            opinion=req.opinion,
-            health_frac=req.health_frac,
-            hunger_frac=req.hunger_frac,
-        ) + f"\n\nMEMORY:\n{memory_block}\n"
+        subs = {
+            "{npc_name}": req.npc_name,
+            "{race}": req.race,
+            "{faction}": req.faction or "unaffiliated",
+            "{player_faction_rel}": str(req.player_faction_rel),
+            "{opinion}": str(req.opinion),
+            "{health_frac}": f"{req.health_frac:.0%}",
+            "{hunger_frac}": f"{req.hunger_frac:.0%}",
+        }
+        system = self._system_tmpl
+        for placeholder, value in subs.items():
+            system = system.replace(placeholder, value)
+        system += f"\n\nMEMORY:\n{memory_block}\n"
 
         messages = [
             {"role": "system", "content": system},
@@ -123,8 +127,13 @@ class ChatAgent:
         if not content.strip():
             return None
         try:
-            payload = json.loads(content)
-            payload.setdefault("npc_id", npc_id)
+            # Strip markdown fences some providers add despite json_object mode
+            clean = content.strip()
+            if clean.startswith("```"):
+                clean = clean.split("\n", 1)[-1]
+                clean = clean.rsplit("```", 1)[0].strip()
+            payload = json.loads(clean)
+            payload["npc_id"] = npc_id  # always enforce — model shouldn't generate this
             return ChatResponse(**payload)
         except (json.JSONDecodeError, ValidationError) as exc:
             log.warning("response parse failed: %s — content=%r", exc, content[:200])

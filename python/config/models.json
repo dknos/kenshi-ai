@@ -1,0 +1,10 @@
+{
+    "Grok-4-Fast": {
+        "provider": "openrouter",
+        "model": "x-ai/grok-4-fast"
+    },
+    "Claude-Haiku-4.5": {
+        "provider": "openrouter",
+        "model": "anthropic/claude-haiku-4-5"
+    }
+}

@@ -30,4 +30,28 @@ RULES OF PLAY:
 - Respond with 1-3 sentences unless the player explicitly asks for a story.
 
 OUTPUT:
-Return a JSON object matching the ChatResponse schema. `actions` is an ordered list; always include at least one `speak` action. Do not wrap the JSON in markdown fences.
+Return ONLY a raw JSON object — no markdown fences, no extra text. Schema:
+
+{
+  "npc_id": "<copy from context>",
+  "opinion_after": <integer -100..100>,
+  "faction_relation_after": <integer -100..100>,
+  "actions": [
+    {"kind": "speak", "text": "..."},
+    {"kind": "give_item", "item": "Bread", "quantity": 1},
+    {"kind": "take_item", "item": "Cats", "quantity": 500},
+    {"kind": "transfer_cats", "amount": 200},
+    {"kind": "follow"},
+    {"kind": "idle"},
+    {"kind": "recruit_accept"},
+    {"kind": "recruit_decline", "reason": "..."},
+    {"kind": "attack_target", "target_npc_id": "..."},
+    {"kind": "flee"},
+    {"kind": "call_guards"},
+    {"kind": "opinion_delta", "delta": 10},
+    {"kind": "faction_relation_delta", "faction": "Holy Nation", "delta": -5},
+    {"kind": "reveal_rumor", "rumor_id": "..."}
+  ]
+}
+
+Include only the actions that apply to this turn. Always include at least one {"kind": "speak", "text": "..."}.

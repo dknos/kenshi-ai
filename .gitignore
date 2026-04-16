@@ -37,3 +37,4 @@ native/out/
 .vscode/
 .idea/
 *.swp
+python/config/providers.json

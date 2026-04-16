@@ -1,9 +1,6 @@
 """Pydantic action schema.
 
-Why this exists: the upstream mod uses ad-hoc bracket-tag parsing like
-`[ACTION: GIVE_ITEM: GIVE_ITEM:Hashish]` — empirically every model (GLM,
-DeepSeek, Grok, Kimi, mimo) duplicates the tag. We replace that with
-structured JSON tool-call-style actions, validated by Pydantic before the hook
+Structured JSON tool-call-style actions validated by Pydantic before the hook
 sees them. Unparseable / unknown / out-of-range actions are rejected, not
 half-applied.
 """

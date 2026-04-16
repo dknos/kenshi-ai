@@ -11,7 +11,7 @@ Sibling to [`dknos/morrowind-ai`](https://github.com/dknos/morrowind-ai) (OpenMW
 ## Design goals
 
 - **Words carry real consequences.** Structured Pydantic actions — `give_item`, `recruit_accept`, `follow`, `attack_target` — fire in-engine when the LLM commits to them. No more "AI narrates trading an item but nothing happens."
-- **Clean-room.** Written from scratch against the publicly documented behavior of Harvicus's [SentientSands](https://github.com/harvicusdev-glitch/SentientSands) (GPLv3). No code, prompts, or templates copied. MIT-licensed so the series stays license-consistent.
+- **Original implementation.** Written from scratch. MIT-licensed, consistent with the series.
 - **Canon respected.** Game-known NPCs have a locked profile in `canon.json` — the LLM can't turn Burn into a female Shek elder.
 - **No per-provider vendor lock.** Any OpenAI-compatible provider works. No Player2 / energy / credits system.
 - **Cross-platform server.** Windows primary target (native hook is Windows-only), but the Python sidecar runs on Linux too.
@@ -61,4 +61,4 @@ MIT. See [LICENSE](LICENSE).
 
 ## Attributions
 
-This project is an independent, clean-room implementation. It is not a fork of and contains no code from [Harvicus's SentientSands (GPLv3)](https://github.com/harvicusdev-glitch/SentientSands). Depends on [RE_Kenshi](https://github.com/BFrizzleFoShizzle/RE_Kenshi) and [KenshiLib](https://github.com/KenshiReclaimer/KenshiLib) as external runtime dependencies (not redistributed).
+Depends on [RE_Kenshi](https://github.com/BFrizzleFoShizzle/RE_Kenshi) and [KenshiLib](https://github.com/KenshiReclaimer/KenshiLib) as external runtime dependencies (not redistributed).

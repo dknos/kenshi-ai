@@ -51,8 +51,9 @@ namespace State
         if (npc->getRace())
             race = npc->getRace()->name;
 
-        if (npc->getOwnFaction())
-            faction = npc->getOwnFaction()->getName();
+        // Faction lives on the platoon, not directly on Character.
+        if (npc->getPlatoon() && npc->getPlatoon()->getFaction())
+            faction = npc->getPlatoon()->getFaction()->getName();
 
         // Health and hunger (0.0 – 1.0)
         float healthFrac = 1.0f;
@@ -62,23 +63,27 @@ namespace State
             float maxHp = npc->stats->getMaxHP();
             if (maxHp > 0.f)
                 healthFrac = std::clamp(npc->stats->getHP() / maxHp, 0.f, 1.f);
-            // Hunger: stats stores a 0-100 float where 100 = starving
-            hungerFrac = std::clamp(npc->stats->hunger / 100.f, 0.f, 1.f);
+            // CharStats has no raw hunger float; Character::wantsToEatNow() is
+            // the only accessible hunger indicator from KenshiLib headers.
+            hungerFrac = npc->wantsToEatNow() ? 1.0f : 0.0f;
         }
 
         // ── Player fields ──────────────────────────────────────────────────
         std::string playerFaction;
         int playerFactionRel = 0;
 
-        if (player && player->getOwnFaction())
-            playerFaction = player->getOwnFaction()->getName();
+        if (player && player->getPlatoon() && player->getPlatoon()->getFaction())
+            playerFaction = player->getPlatoon()->getFaction()->getName();
 
-        if (npc->getOwnFaction() && player && player->getOwnFaction())
         {
-            playerFactionRel = static_cast<int>(
-                npc->getOwnFaction()->getRelationsTowards(
-                    player->getOwnFaction()));
-            playerFactionRel = std::clamp(playerFactionRel, -100, 100);
+            Faction* npcFaction    = npc->getPlatoon()    ? npc->getPlatoon()->getFaction()    : nullptr;
+            Faction* playerFactionPtr = (player && player->getPlatoon()) ? player->getPlatoon()->getFaction() : nullptr;
+            if (npcFaction && playerFactionPtr)
+            {
+                playerFactionRel = static_cast<int>(
+                    npcFaction->getRelationsTowards(playerFactionPtr));
+                playerFactionRel = std::clamp(playerFactionRel, -100, 100);
+            }
         }
 
         // ── Build JSON manually (no external json lib dependency) ──────────

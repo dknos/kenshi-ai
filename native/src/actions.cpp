@@ -29,42 +29,33 @@ namespace Actions
             dlg->say(resp.speakText, nullptr);
 
         // ── recruit_accept → DA_JOIN_SQUAD_FAST ────────────────────────────
-        if (resp.recruitAccept)
-        {
-            DialogLineData::DialogAction action;
-            action.key   = DA_JOIN_SQUAD_FAST;
-            action.value = 0;
-            // _doActions is private; workaround: inject a synthetic line via
-            // sendEvent with a pre-built one-line dialogue package (post-MVP).
-            // For now: trigger the built-in "JOIN" event which fires the same code.
-            dlg->sendEventOverride(npc, EV_DIALOG_JOIN, true);
-        }
+        // Dialogue::_doActions() is private; dispatching a DialogActionEnum
+        // requires constructing a DialogLineData with a populated lektor<Action*>
+        // and calling the public say(DialogLineData*) overload.  The lektor API
+        // is not yet reverse-engineered.  Phase 5 will wire this properly.
+        // For now the LLM's spoken acceptance line is the only observable effect.
 
-        // ── recruit_decline — no engine action needed, speech already sent ──
+        // ── recruit_decline — speech line is sufficient ────────────────────
 
         // ── follow → DA_FOLLOW_WHILE_TALKING ──────────────────────────────
-        if (resp.follow)
-            dlg->sendEventOverride(npc, EV_DIALOG_FOLLOW, true);
+        // Same DialogLineData constraint as recruit.  Phase 5 TODO.
 
         // ── idle → DA_CLEAR_AI ─────────────────────────────────────────────
-        if (resp.idle)
-            dlg->sendEventOverride(npc, EV_DIALOG_IDLE, true);
+        // Same DialogLineData constraint.  Phase 5 TODO.
 
         // ── flee → DA_RUN_AWAY ─────────────────────────────────────────────
+        // EV_SQUAD_BROKEN fires the NPC's "squad routed" response which
+        // triggers flee AI.  Nearest available event without DialogLineData.
         if (resp.flee)
-            dlg->sendEventOverride(npc, EV_DIALOG_RUN_AWAY, true);
+            dlg->sendEventOverride(npc, EV_SQUAD_BROKEN, true);
 
         // ── call_guards → DA_CRIME_ALARM ──────────────────────────────────
         if (resp.callGuards)
-            dlg->sendEventOverride(npc, EV_DIALOG_CRIME_ALARM, true);
+            dlg->sendEventOverride(npc, EV_SOUND_THE_ALARM, true);
 
         // ── attack_target → DA_ATTACK_CHASE_FOREVER ───────────────────────
-        if (resp.attackTarget && !resp.attackTargetId.empty())
-        {
-            // Resolve target by npc_id pointer (stored as address string).
-            // TODO: more robust lookup via GameWorld character list.
-            dlg->sendEventOverride(npc, EV_DIALOG_ATTACK, true);
-        }
+        if (resp.attackTarget)
+            dlg->sendEventOverride(npc, EV_LAUNCH_ATTACK, true);
 
         // ── give_item / take_item / transfer_cats ─────────────────────────
         // These require Inventory access; stubbed for post-MVP.

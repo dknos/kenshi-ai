@@ -74,6 +74,7 @@ namespace KenshiAI
     {
         ParsedResponse r;
 
+        // Extract a quoted string value by key from the root JSON object.
         auto extractStr = [&](const std::string& key) -> std::string {
             auto pos = json.find("\"" + key + "\":");
             if (pos == std::string::npos) return "";
@@ -83,13 +84,53 @@ namespace KenshiAI
             return (end == std::string::npos) ? "" : json.substr(pos + 1, end - pos - 1);
         };
 
-        r.npcId = extractStr("npc_id");
+        // Extract an integer value by key from the root JSON object.
+        auto extractInt = [&](const std::string& key) -> int {
+            auto pos = json.find("\"" + key + "\":");
+            if (pos == std::string::npos) return 0;
+            pos += key.size() + 3;
+            while (pos < json.size() && (json[pos]==' '||json[pos]=='\t')) ++pos;
+            if (pos >= json.size()) return 0;
+            bool neg = (json[pos] == '-'); if (neg) ++pos;
+            int val = 0;
+            while (pos < json.size() && std::isdigit((unsigned char)json[pos]))
+                val = val * 10 + (json[pos++] - '0');
+            return neg ? -val : val;
+        };
 
-        // Scan actions array
+        r.npcId       = extractStr("npc_id");
+        r.opinionAfter = extractInt("opinion_after");
+
+        // Scan actions array — each action object starts after a "kind" key.
         auto actStart = json.find("\"actions\"");
         if (actStart != std::string::npos)
         {
-            std::string sub = json.substr(actStart);
+            const std::string sub = json.substr(actStart);
+
+            // Within sub, extract a quoted string by key starting near `from`.
+            auto localStr = [&](size_t from, const std::string& key) -> std::string {
+                auto p = sub.find("\"" + key + "\":", from);
+                if (p == std::string::npos || p > from + 300) return "";
+                auto qs = sub.find('"', p + key.size() + 3);
+                auto qe = sub.find('"', qs + 1);
+                if (qs == std::string::npos || qe == std::string::npos) return "";
+                return sub.substr(qs + 1, qe - qs - 1);
+            };
+
+            // Within sub, extract an integer by key starting near `from`.
+            auto localInt = [&](size_t from, const std::string& key) -> int {
+                auto p = sub.find("\"" + key + "\":", from);
+                if (p == std::string::npos || p > from + 300) return 0;
+                p += key.size() + 3;
+                while (p < sub.size() && (sub[p]==' '||sub[p]=='\t')) ++p;
+                if (p >= sub.size()) return 0;
+                bool neg = (sub[p] == '-'); if (neg) ++p;
+                int val = 0;
+                while (p < sub.size() && std::isdigit((unsigned char)sub[p]))
+                    val = val * 10 + (sub[p++] - '0');
+                return neg ? -val : val;
+            };
+
             size_t pos = 0;
             while ((pos = sub.find("\"kind\"", pos)) != std::string::npos)
             {
@@ -100,13 +141,7 @@ namespace KenshiAI
 
                 if (kind == "speak" && r.speakText.empty())
                 {
-                    auto ts = sub.find("\"text\"", pos);
-                    if (ts != std::string::npos) {
-                        auto qs = sub.find('"', ts + 7);
-                        auto qe = sub.find('"', qs + 1);
-                        if (qs != std::string::npos && qe != std::string::npos)
-                            r.speakText = sub.substr(qs + 1, qe - qs - 1);
-                    }
+                    r.speakText = localStr(pos, "text");
                 }
                 else if (kind == "recruit_accept")  r.recruitAccept  = true;
                 else if (kind == "recruit_decline")  r.recruitDecline = true;
@@ -116,7 +151,27 @@ namespace KenshiAI
                 else if (kind == "call_guards")      r.callGuards     = true;
                 else if (kind == "attack_target") {
                     r.attackTarget   = true;
-                    r.attackTargetId = extractStr("target_npc_id");
+                    r.attackTargetId = localStr(pos, "target_npc_id");
+                }
+                else if (kind == "give_item") {
+                    r.giveItemName = localStr(pos, "item");
+                    r.giveItemQty  = localInt(pos, "quantity");
+                    if (r.giveItemQty < 1) r.giveItemQty = 1;
+                }
+                else if (kind == "take_item") {
+                    r.takeItemName = localStr(pos, "item");
+                    r.takeItemQty  = localInt(pos, "quantity");
+                    if (r.takeItemQty < 1) r.takeItemQty = 1;
+                }
+                else if (kind == "transfer_cats") {
+                    r.transferCats = localInt(pos, "amount");
+                }
+                else if (kind == "opinion_delta") {
+                    r.opinionDelta = localInt(pos, "delta");
+                }
+                else if (kind == "faction_relation_delta") {
+                    r.factionRelDelta  = localInt(pos, "delta");
+                    r.factionRelTarget = localStr(pos, "faction");
                 }
 
                 pos = vend + 1;
@@ -124,5 +179,20 @@ namespace KenshiAI
         }
 
         return r;
+    }
+
+    // ---------- Opinion cache ------------------------------------------------
+
+    static std::unordered_map<uintptr_t, int> s_opinionMap;
+
+    int GetOpinion(uintptr_t npcAddr)
+    {
+        auto it = s_opinionMap.find(npcAddr);
+        return (it != s_opinionMap.end()) ? it->second : 0;
+    }
+
+    void SetOpinion(uintptr_t npcAddr, int value)
+    {
+        s_opinionMap[npcAddr] = std::max(-100, std::min(100, value));
     }
 }

@@ -117,17 +117,17 @@ Kenshi/mods/kenshi-ai/
 |---|---|
 | `speak` | `Dialogue::say()` speech bubble |
 | `recruit_accept` | `PlayerInterface::recruit()` |
+| `follow` | `_doActions(DA_FOLLOW_WHILE_TALKING)` via RVA |
+| `idle` | `_doActions(DA_CLEAR_AI)` via RVA |
 | `flee` | `sendEventOverride(EV_SQUAD_BROKEN)` |
 | `call_guards` | `sendEventOverride(EV_SOUND_THE_ALARM)` |
 | `attack_target` | `sendEventOverride(EV_LAUNCH_ATTACK)` |
-| `recruit_decline` | speech only |
-| `follow` | stub — Phase 5 |
-| `idle` | stub — Phase 5 |
-| `give_item` | stub — Phase 5 |
-| `take_item` | stub — Phase 5 |
-| `transfer_cats` | stub — Phase 5 |
-| `opinion_delta` | stub — Phase 5 |
+| `transfer_cats` | `_doActions(DA_GIVE/TAKE_MONEY)` via RVA |
+| `give_item` | NPC `Inventory` → player `Inventory` transfer |
+| `take_item` | player `Inventory` → NPC `Inventory` transfer |
+| `opinion_delta` | session opinion cache, sent each turn |
 | `faction_relation_delta` | `FactionRelations::affectRelations()` |
+| `recruit_decline` | speech only |
 
 ## Runtime dependencies (not redistributed)
 

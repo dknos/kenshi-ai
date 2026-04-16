@@ -86,19 +86,22 @@ namespace State
             }
         }
 
+        int opinion = KenshiAI::GetOpinion(reinterpret_cast<uintptr_t>(npc));
+
         // ── Build JSON manually (no external json lib dependency) ──────────
         std::ostringstream j;
         j << "{"
-          << "\"npc_id\":\""        << jsonEscape(npcId)          << "\","
-          << "\"npc_name\":\""      << jsonEscape(npcName)        << "\","
-          << "\"race\":\""          << jsonEscape(race)           << "\","
-          << "\"faction\":\""       << jsonEscape(faction)        << "\","
-          << "\"health_frac\":"     << healthFrac                 << ","
-          << "\"hunger_frac\":"     << hungerFrac                 << ","
-          << "\"player_faction\":\"" << jsonEscape(playerFaction) << "\","
-          << "\"player_faction_rel\":" << playerFactionRel        << ","
-          << "\"campaign_id\":\""   << jsonEscape(KenshiAI::g_config.campaignId) << "\","
-          << "\"message\":\""       << jsonEscape(playerMessage)  << "\""
+          << "\"npc_id\":\""           << jsonEscape(npcId)          << "\","
+          << "\"npc_name\":\""         << jsonEscape(npcName)        << "\","
+          << "\"race\":\""             << jsonEscape(race)           << "\","
+          << "\"faction\":\""          << jsonEscape(faction)        << "\","
+          << "\"health_frac\":"        << healthFrac                 << ","
+          << "\"hunger_frac\":"        << hungerFrac                 << ","
+          << "\"player_faction\":\""   << jsonEscape(playerFaction)  << "\","
+          << "\"player_faction_rel\":" << playerFactionRel           << ","
+          << "\"opinion\":"            << opinion                    << ","
+          << "\"campaign_id\":\""      << jsonEscape(KenshiAI::g_config.campaignId) << "\","
+          << "\"message\":\""          << jsonEscape(playerMessage)  << "\""
           << "}";
 
         return j.str();

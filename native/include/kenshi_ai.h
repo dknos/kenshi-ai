@@ -25,21 +25,22 @@ namespace KenshiAI
     struct ParsedResponse
     {
         std::string npcId;
-        std::string speakText;      // first "speak" action
-        bool recruitAccept  = false;
-        bool recruitDecline = false;
-        bool follow         = false;
-        bool idle           = false;
-        bool flee           = false;
-        bool callGuards     = false;
-        bool attackTarget   = false;
+        std::string speakText;
+        bool recruitAccept   = false;
+        bool recruitDecline  = false;
+        bool follow          = false;
+        bool idle            = false;
+        bool flee            = false;
+        bool callGuards      = false;
+        bool attackTarget    = false;
         std::string attackTargetId;
-        int  giveItemQty    = 0;
         std::string giveItemName;
-        int  takeItemQty    = 0;
+        int  giveItemQty     = 0;
         std::string takeItemName;
-        int  transferCats   = 0;
-        int  opinionDelta   = 0;
+        int  takeItemQty     = 0;
+        int  transferCats    = 0;   // +NPC pays player, -player pays NPC
+        int  opinionDelta    = 0;
+        int  opinionAfter    = 0;   // absolute opinion returned by sidecar
         int  factionRelDelta = 0;
         std::string factionRelTarget;
     };
@@ -61,4 +62,11 @@ namespace KenshiAI
 
     extern Config g_config;
     void LoadConfig(const std::string& modFolder);
+
+    // ---------- Opinion cache ------------------------------------------------
+    // Tracks the last-known opinion per NPC (keyed by Character pointer address).
+    // Persists within a game session; survives multiple conversations with the
+    // same NPC.  Reset when the campaign_id changes.
+    int  GetOpinion(uintptr_t npcAddr);
+    void SetOpinion(uintptr_t npcAddr, int value);
 }

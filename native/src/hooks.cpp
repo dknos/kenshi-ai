@@ -75,10 +75,8 @@ static bool hook_startPlayerConversation(Dialogue* self,
     if (!result || !target)
         return result;
 
-    // Grab the player character from the game's player interface.
-    Character* player = nullptr;
-    if (ou && ou->playerFaction && !ou->playerFaction->characters.empty())
-        player = ou->playerFaction->characters[0]; // squad slot 0 -> active speaker
+    // Grab the player character from PlayerInterface.
+    Character* player = (ou && ou->player) ? ou->player->getAnyPlayerCharacter() : nullptr;
 
     // Build JSON request and fire async HTTP.
     // The player's actual typed message isn't intercepted here — we trigger
@@ -110,18 +108,25 @@ static void hook_dialogueUpdate(Dialogue* self, float frameTime)
     orig_dialogueUpdate(self, frameTime);
 
     // Drain responses destined for this Dialogue instance.
-    std::lock_guard<std::mutex> lk(g_queueMutex);
-    while (!g_responseQueue.empty())
+    // We can't break on mismatches because std::queue is FIFO — a response for
+    // a different Dialogue* would permanently block everything behind it.
+    // Move unmatched items to a temp queue and put them back after.
+    std::queue<QueuedResponse> unmatched;
     {
-        QueuedResponse& qr = g_responseQueue.front();
-        if (qr.dialogue == self)
+        std::lock_guard<std::mutex> lk(g_queueMutex);
+        while (!g_responseQueue.empty())
         {
-            Actions::DispatchResponse(qr.dialogue, qr.character, qr.parsed);
+            QueuedResponse qr = std::move(g_responseQueue.front());
             g_responseQueue.pop();
+            if (qr.dialogue == self)
+                Actions::DispatchResponse(qr.dialogue, qr.character, qr.parsed);
+            else
+                unmatched.push(std::move(qr));
         }
-        else
+        while (!unmatched.empty())
         {
-            break; // Not ours — leave for the right Dialogue's update tick.
+            g_responseQueue.push(std::move(unmatched.front()));
+            unmatched.pop();
         }
     }
 }
@@ -132,8 +137,14 @@ namespace Hooks
 {
     void Init()
     {
+        // startPlayerConversation is private in the game class — member pointer
+        // syntax won't compile outside the class.  Use the known RVA instead.
+        // RVA 0x683BA0 from KenshiLib/Include/kenshi/Dialogue.h.
+        void* spcAddr = reinterpret_cast<void*>(
+            reinterpret_cast<uintptr_t>(GetModuleHandle("kenshi_x64.exe")) + 0x683BA0);
+
         KenshiLib::AddHook(
-            KenshiLib::GetRealAddress(&Dialogue::startPlayerConversation),
+            spcAddr,
             (void*)hook_startPlayerConversation,
             (void**)&orig_startPlayerConversation
         );

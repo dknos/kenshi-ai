@@ -11,6 +11,7 @@
 #include <kenshi/Character.h>
 #include <kenshi/Globals.h>
 #include <kenshi/GameWorld.h>
+#include <kenshi/PlayerInterface.h>
 
 #include "kenshi_ai.h"
 
@@ -28,20 +29,19 @@ namespace Actions
         if (!resp.speakText.empty())
             dlg->say(resp.speakText, nullptr);
 
-        // ── recruit_accept → DA_JOIN_SQUAD_FAST ────────────────────────────
-        // Dialogue::_doActions() is private; dispatching a DialogActionEnum
-        // requires constructing a DialogLineData with a populated lektor<Action*>
-        // and calling the public say(DialogLineData*) overload.  The lektor API
-        // is not yet reverse-engineered.  Phase 5 will wire this properly.
-        // For now the LLM's spoken acceptance line is the only observable effect.
+        // ── recruit_accept → PlayerInterface::recruit() ───────────────────
+        // No need for DialogLineData here — PlayerInterface exposes recruit()
+        // directly.  ou->player is the active PlayerInterface instance.
+        if (resp.recruitAccept && ou && ou->player)
+            ou->player->recruit(npc, false);
 
         // ── recruit_decline — speech line is sufficient ────────────────────
 
         // ── follow → DA_FOLLOW_WHILE_TALKING ──────────────────────────────
-        // Same DialogLineData constraint as recruit.  Phase 5 TODO.
+        // Needs DialogLineData + lektor RE.  Phase 5 TODO.
 
         // ── idle → DA_CLEAR_AI ─────────────────────────────────────────────
-        // Same DialogLineData constraint.  Phase 5 TODO.
+        // Needs DialogLineData + lektor RE.  Phase 5 TODO.
 
         // ── flee → DA_RUN_AWAY ─────────────────────────────────────────────
         // EV_SQUAD_BROKEN fires the NPC's "squad routed" response which

@@ -28,8 +28,9 @@
 #include <mutex>
 #include <queue>
 #include <string>
+#include <sstream>
 #include <unordered_map>
-#include <chrono>
+#include <vector>
 
 // ── Response queue ────────────────────────────────────────────────────────────
 
@@ -56,6 +57,13 @@ static std::queue<QueuedD2DResponse> g_d2dQueue;
 // Radiant timer — fire D2D once per g_radiantIntervalS game-seconds elapsed.
 static float g_radiantAccumS     = 0.f;
 static float g_radiantIntervalS  = 240.f;  // overridden from config in Init()
+
+// Recent-NPC cache — populated by hook_startPlayerConversation.
+// Radiant scan picks two entries for ambient D2D without needing
+// full GameWorld character enumeration.
+struct CachedNPC { Dialogue* dlg; Character* chr; };
+static std::vector<CachedNPC> g_recentNPCs;
+static constexpr size_t RECENT_NPC_CACHE = 8;
 
 // ── Actions (defined in actions.cpp) ─────────────────────────────────────────
 namespace Actions
@@ -92,6 +100,14 @@ static bool hook_startPlayerConversation(Dialogue* self,
 
     // Grab the player character from PlayerInterface.
     Character* player = (ou && ou->player) ? ou->player->getAnyPlayerCharacter() : nullptr;
+
+    // Update recent-NPC cache for the radiant D2D scan.
+    bool found = false;
+    for (auto& e : g_recentNPCs) { if (e.chr == target) { found = true; break; } }
+    if (!found) {
+        if (g_recentNPCs.size() >= RECENT_NPC_CACHE) g_recentNPCs.erase(g_recentNPCs.begin());
+        g_recentNPCs.push_back({self, target});
+    }
 
     // Build JSON request and fire async HTTP.
     // The player's actual typed message isn't intercepted here — we trigger
@@ -145,22 +161,93 @@ static void hook_dialogueUpdate(Dialogue* self, float frameTime)
         }
     }
 
-    // Radiant D2D: accumulate time and fire ambient NPC exchanges.
+    // Radiant D2D: fire ambient NPC exchange when the timer fires.
     g_radiantAccumS += frameTime;
-    if (g_radiantAccumS >= g_radiantIntervalS)
+    if (g_radiantAccumS >= g_radiantIntervalS && g_recentNPCs.size() >= 2)
     {
         g_radiantAccumS = 0.f;
-        // TODO Phase 6: scan nearby NPCs, build D2D request, PostD2D(json, cb).
-        // Stub present — wires the timer infrastructure.
+
+        // Pick two distinct cached NPCs.
+        const CachedNPC& a = g_recentNPCs[g_recentNPCs.size() - 1];
+        const CachedNPC& b = g_recentNPCs[g_recentNPCs.size() - 2];
+
+        if (a.chr && b.chr)
+        {
+            // Build D2D JSON manually (mirrors D2DRequest schema).
+            auto esc = [](const std::string& s) -> std::string {
+                std::string o; o.reserve(s.size());
+                for (char c : s) {
+                    if (c == '"') o += "\\\""; else if (c == '\\') o += "\\\\"; else o += c;
+                } return o;
+            };
+            std::string npcAId   = std::to_string(reinterpret_cast<uintptr_t>(a.chr));
+            std::string npcBId   = std::to_string(reinterpret_cast<uintptr_t>(b.chr));
+            std::string npcAName = a.chr->getName();
+            std::string npcBName = b.chr->getName();
+            std::string npcARace = a.chr->getRace() ? a.chr->getRace()->name : "Unknown";
+            std::string npcBRace = b.chr->getRace() ? b.chr->getRace()->name : "Unknown";
+            std::string npcAFac  = (a.chr->getPlatoon() && a.chr->getPlatoon()->getFaction())
+                                    ? a.chr->getPlatoon()->getFaction()->getName() : "";
+            std::string npcBFac  = (b.chr->getPlatoon() && b.chr->getPlatoon()->getFaction())
+                                    ? b.chr->getPlatoon()->getFaction()->getName() : "";
+
+            std::ostringstream j;
+            j << "{"
+              << "\"npc_a_id\":\""      << esc(npcAId)   << "\","
+              << "\"npc_a_name\":\""    << esc(npcAName) << "\","
+              << "\"npc_a_race\":\""    << esc(npcARace) << "\","
+              << "\"npc_a_faction\":\"" << esc(npcAFac)  << "\","
+              << "\"npc_b_id\":\""      << esc(npcBId)   << "\","
+              << "\"npc_b_name\":\""    << esc(npcBName) << "\","
+              << "\"npc_b_race\":\""    << esc(npcBRace) << "\","
+              << "\"npc_b_faction\":\"" << esc(npcBFac)  << "\","
+              << "\"campaign_id\":\""   << esc(KenshiAI::g_config.campaignId) << "\""
+              << "}";
+
+            KenshiAI::PostD2D(j.str(), [](const std::string& json)
+            {
+                std::lock_guard<std::mutex> lk(g_d2dMutex);
+                g_d2dQueue.push({json});
+            });
+        }
     }
 
-    // Drain pending D2D responses.
+    // Drain D2D responses: parse each line and say() it via the right Dialogue.
     {
         std::lock_guard<std::mutex> lk(g_d2dMutex);
         while (!g_d2dQueue.empty())
         {
-            // TODO Phase 6: parse D2DResponse JSON and dispatch say() calls.
+            std::string json = std::move(g_d2dQueue.front().json);
             g_d2dQueue.pop();
+
+            // Minimal parse of {"lines":[{"speaker_id":"...","text":"..."},...]}
+            size_t pos = 0;
+            while ((pos = json.find("\"speaker_id\"", pos)) != std::string::npos)
+            {
+                auto idStart = json.find('"', pos + 13);
+                auto idEnd   = json.find('"', idStart + 1);
+                auto txtStart = json.find("\"text\"", idEnd);
+                if (txtStart == std::string::npos) break;
+                auto qs = json.find('"', txtStart + 7);
+                auto qe = json.find('"', qs + 1);
+                if (idStart == std::string::npos || idEnd == std::string::npos ||
+                    qs == std::string::npos || qe == std::string::npos) break;
+
+                std::string speakerId = json.substr(idStart + 1, idEnd - idStart - 1);
+                std::string text      = json.substr(qs + 1, qe - qs - 1);
+
+                // Find the cached Dialogue for this speaker.
+                for (auto& e : g_recentNPCs)
+                {
+                    if (e.dlg && e.chr &&
+                        std::to_string(reinterpret_cast<uintptr_t>(e.chr)) == speakerId)
+                    {
+                        e.dlg->say(text, nullptr);
+                        break;
+                    }
+                }
+                pos = qe + 1;
+            }
         }
     }
 }

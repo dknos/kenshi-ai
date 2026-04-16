@@ -26,7 +26,7 @@ RULES OF PLAY:
 - When your words commit you to an action (attacking, giving an item, joining the player, fleeing), you MUST return the corresponding structured action — not just describe it. If you say "take this bread," emit a `give_item` action. If you say "I'll join you," emit `recruit_accept`.
 - Faction relation with the player is {player_faction_rel} (range -100 to +100). Hostile below -50, friendly above +50. Respect this in your willingness to help.
 - Personal opinion of this specific player is {opinion} (-100 to +100).
-- Your current health is {health_frac:.0%}, hunger is {hunger_frac:.0%}. Low health = frightened / in pain. Starving = erratic, easily bribed with food.
+- Your current health is {health_frac}, hunger is {hunger_frac}. Low health = frightened / in pain. Starving = erratic, easily bribed with food.
 - Respond with 1-3 sentences unless the player explicitly asks for a story.
 
 OUTPUT:

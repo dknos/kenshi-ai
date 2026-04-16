@@ -78,9 +78,10 @@ namespace Actions
         {
             Faction* npcFaction = npc->getPlatoon() ? npc->getPlatoon()->getFaction() : nullptr;
             Faction* playerFaction = (ou && ou->player) ? ou->player->getFaction() : nullptr;
-            if (npcFaction && playerFaction && npcFaction->factionRelations)
+            // Faction::relations is the FactionRelations* at offset 0x78 (Faction.h)
+            if (npcFaction && playerFaction && npcFaction->relations)
             {
-                npcFaction->factionRelations->affectRelations(
+                npcFaction->relations->affectRelations(
                     playerFaction,
                     static_cast<float>(resp.factionRelDelta),
                     1.0f

@@ -40,14 +40,16 @@ class D2DAgent:
 
         prompt = (
             self._tmpl
-            .replace("{npc_a_name}", req.npc_a_name)
-            .replace("{npc_a_race}", req.npc_a_race)
+            .replace("{npc_a_id}",      req.npc_a_id)
+            .replace("{npc_b_id}",      req.npc_b_id)
+            .replace("{npc_a_name}",    req.npc_a_name)
+            .replace("{npc_a_race}",    req.npc_a_race)
             .replace("{npc_a_faction}", req.npc_a_faction or "unaffiliated")
-            .replace("{npc_b_name}", req.npc_b_name)
-            .replace("{npc_b_race}", req.npc_b_race)
+            .replace("{npc_b_name}",    req.npc_b_name)
+            .replace("{npc_b_race}",    req.npc_b_race)
             .replace("{npc_b_faction}", req.npc_b_faction or "unaffiliated")
-            .replace("{location}", req.location or "the wastes")
-            .replace("{memory}", mem_block)
+            .replace("{location}",      req.location or "the wastes")
+            .replace("{memory}",        mem_block)
         )
 
         messages = [

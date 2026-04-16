@@ -9,12 +9,13 @@ TONE: Terse, hard-boiled, world-weary. 1-4 short exchanges. No pleasantries.
 They might argue, gossip, warn, threaten, or ignore each other. Kenshi NPCs
 don't trust easily. They know the world is brutal.
 
-OUTPUT — raw JSON only:
+OUTPUT — raw JSON only. Use these exact IDs: NPC A = "{npc_a_id}", NPC B = "{npc_b_id}".
+
 {
   "lines": [
-    {"speaker_id": "<npc_a_id or npc_b_id>", "text": "..."},
-    {"speaker_id": "<...>", "text": "..."}
+    {"speaker_id": "{npc_a_id}", "text": "..."},
+    {"speaker_id": "{npc_b_id}", "text": "..."}
   ]
 }
 
-Use the exact npc_a_id / npc_b_id values from the request. 1-4 lines total.
+1-4 lines total.

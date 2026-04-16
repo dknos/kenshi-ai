@@ -97,7 +97,7 @@ static void DialogThread()
     wc.cbSize        = sizeof(wc);
     wc.lpfnWndProc   = WndProc;
     wc.hInstance     = GetModuleHandleA(nullptr);
-    wc.hCursor       = LoadCursorA(nullptr, IDC_ARROW);
+    wc.hCursor       = LoadCursorW(nullptr, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     wc.lpszClassName = "KenshiAI_Input";
     RegisterClassExA(&wc);

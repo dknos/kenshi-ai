@@ -65,8 +65,20 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     case WM_IDIALOG_SHOW:
         SetWindowTextA(g_edit, "");
         ShowWindow(hwnd, SW_SHOW);
+        SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+        AllowSetForegroundWindow(ASFW_ANY);
         SetForegroundWindow(hwnd);
         SetFocus(g_edit);
+        // Flash taskbar so user notices if fullscreen hides the window
+        {
+            FLASHWINFO fi = {};
+            fi.cbSize    = sizeof(fi);
+            fi.hwnd      = hwnd;
+            fi.dwFlags   = FLASHW_ALL | FLASHW_TIMERNOFG;
+            fi.uCount    = 3;
+            fi.dwTimeout = 200;
+            FlashWindowEx(&fi);
+        }
         return 0;
 
     case WM_COMMAND:

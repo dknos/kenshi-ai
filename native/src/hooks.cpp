@@ -158,7 +158,12 @@ static void hook_dialogueUpdate(Dialogue* self, float frameTime)
     // Dialogue::update calls (multiple NPCs are updated each frame).
     {
         bool insertDown = (GetAsyncKeyState(VK_INSERT) & 0x8000) != 0;
-        if (insertDown && !g_f9WasDown && g_activeDlg && g_activeNpc)
+        // Use g_recentNPCs as fallback if hook_startPlayerConversation missed 1.0.68
+        if (!g_activeDlg && !g_recentNPCs.empty()) {
+            g_activeDlg = g_recentNPCs.back().dlg;
+            g_activeNpc = g_recentNPCs.back().chr;
+        }
+        if (insertDown && !g_f9WasDown && g_activeNpc)
         {
             Dialogue*  dlg    = g_activeDlg;
             Character* npc    = g_activeNpc;

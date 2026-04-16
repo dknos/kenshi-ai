@@ -153,11 +153,12 @@ static void hook_dialogueUpdate(Dialogue* self, float frameTime)
 {
     orig_dialogueUpdate(self, frameTime);
 
-    // Insert: open player-input dialog when this is the active conversation.
-    if (self == g_activeDlg && g_activeNpc)
+    // Insert: open player-input dialog when any conversation is active.
+    // g_f9WasDown is always updated so the edge-detect works across all
+    // Dialogue::update calls (multiple NPCs are updated each frame).
     {
-        bool f9Down = (GetAsyncKeyState(VK_INSERT) & 0x8000) != 0;
-        if (f9Down && !g_f9WasDown)
+        bool insertDown = (GetAsyncKeyState(VK_INSERT) & 0x8000) != 0;
+        if (insertDown && !g_f9WasDown && g_activeDlg && g_activeNpc)
         {
             Dialogue*  dlg    = g_activeDlg;
             Character* npc    = g_activeNpc;
@@ -177,7 +178,7 @@ static void hook_dialogueUpdate(Dialogue* self, float frameTime)
                 });
             });
         }
-        g_f9WasDown = f9Down;
+        g_f9WasDown = insertDown;
     }
 
     // Drain responses destined for this Dialogue instance.

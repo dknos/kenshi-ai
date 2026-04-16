@@ -48,6 +48,13 @@ extern "C" __declspec(dllexport) void startPlugin()
 
 BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID)
 {
-    // Nothing to do here — RE_Kenshi loads us after the engine is ready.
+    if (reason == DLL_PROCESS_ATTACH)
+    {
+        if (FILE* f = fopen("C:\\Users\\Public\\kenshi_ai_load.txt", "w"))
+        {
+            fprintf(f, "kenshi_ai.dll DLL_PROCESS_ATTACH\n");
+            fclose(f);
+        }
+    }
     return TRUE;
 }

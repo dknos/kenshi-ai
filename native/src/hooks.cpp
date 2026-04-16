@@ -163,6 +163,22 @@ static void hook_dialogueUpdate(Dialogue* self, float frameTime)
             g_activeDlg = g_recentNPCs.back().dlg;
             g_activeNpc = g_recentNPCs.back().chr;
         }
+        if (insertDown && !g_f9WasDown)
+        {
+            // Diagnostic: write once so we can confirm GetAsyncKeyState + hook are working
+            static bool g_diagWritten = false;
+            if (!g_diagWritten) {
+                g_diagWritten = true;
+                if (FILE* f = fopen("C:\\Users\\Public\\kenshi_ai_diag.txt", "w")) {
+                    fprintf(f, "hook_dialogueUpdate reached Insert\n"
+                               "g_activeDlg=%p\ng_activeNpc=%p\n"
+                               "g_recentNPCs.size=%zu\n",
+                               (void*)g_activeDlg, (void*)g_activeNpc,
+                               g_recentNPCs.size());
+                    fclose(f);
+                }
+            }
+        }
         if (insertDown && !g_f9WasDown && g_activeNpc)
         {
             Dialogue*  dlg    = g_activeDlg;

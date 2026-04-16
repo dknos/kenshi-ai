@@ -31,7 +31,11 @@ add_library(kenshi_ai SHARED
 target_include_directories(kenshi_ai PRIVATE
     include
     "${KENSHILIB_DIR}/Include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/deps/boost_stub"
 )
+
+# Prevent Windows.h from defining min/max macros that clash with std::min/max
+target_compile_definitions(kenshi_ai PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
 
 target_link_libraries(kenshi_ai PRIVATE
     "${KENSHILIB_LIB}"

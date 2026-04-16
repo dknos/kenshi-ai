@@ -137,3 +137,28 @@ class ChatRequest(BaseModel):
     message: str
     campaign_id: str = "Default"
     model_override: str | None = None
+
+
+class D2DRequest(BaseModel):
+    """NPC-to-NPC ambient turn posted by the DLL radiant loop."""
+
+    npc_a_id: str
+    npc_a_name: str
+    npc_a_race: str
+    npc_a_faction: str | None = None
+    npc_b_id: str
+    npc_b_name: str
+    npc_b_race: str
+    npc_b_faction: str | None = None
+    location: str | None = None
+    campaign_id: str = "Default"
+    model_override: str | None = None
+
+
+class D2DLine(BaseModel):
+    speaker_id: str
+    text: str
+
+
+class D2DResponse(BaseModel):
+    lines: list[D2DLine] = Field(min_length=1, max_length=4)

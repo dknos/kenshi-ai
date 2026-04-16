@@ -29,6 +29,7 @@
 #include <queue>
 #include <string>
 #include <unordered_map>
+#include <chrono>
 
 // ── Response queue ────────────────────────────────────────────────────────────
 
@@ -41,6 +42,20 @@ struct QueuedResponse
 
 static std::mutex              g_queueMutex;
 static std::queue<QueuedResponse> g_responseQueue;
+
+// ── D2D response queue ────────────────────────────────────────────────────────
+
+struct QueuedD2DResponse
+{
+    std::string json;  // raw JSON — dispatched to nearby NPC say() calls
+};
+
+static std::mutex                    g_d2dMutex;
+static std::queue<QueuedD2DResponse> g_d2dQueue;
+
+// Radiant timer — fire D2D once per g_radiantIntervalS game-seconds elapsed.
+static float g_radiantAccumS     = 0.f;
+static float g_radiantIntervalS  = 240.f;  // overridden from config in Init()
 
 // ── Actions (defined in actions.cpp) ─────────────────────────────────────────
 namespace Actions
@@ -129,6 +144,25 @@ static void hook_dialogueUpdate(Dialogue* self, float frameTime)
             unmatched.pop();
         }
     }
+
+    // Radiant D2D: accumulate time and fire ambient NPC exchanges.
+    g_radiantAccumS += frameTime;
+    if (g_radiantAccumS >= g_radiantIntervalS)
+    {
+        g_radiantAccumS = 0.f;
+        // TODO Phase 6: scan nearby NPCs, build D2D request, PostD2D(json, cb).
+        // Stub present — wires the timer infrastructure.
+    }
+
+    // Drain pending D2D responses.
+    {
+        std::lock_guard<std::mutex> lk(g_d2dMutex);
+        while (!g_d2dQueue.empty())
+        {
+            // TODO Phase 6: parse D2DResponse JSON and dispatch say() calls.
+            g_d2dQueue.pop();
+        }
+    }
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -154,5 +188,7 @@ namespace Hooks
             (void*)hook_dialogueUpdate,
             (void**)&orig_dialogueUpdate
         );
+
+        g_radiantIntervalS = KenshiAI::g_config.radiantDelayS;
     }
 }

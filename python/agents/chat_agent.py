@@ -19,7 +19,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from memory.qdrant_memory import NPCMemory, Turn
+from memory.chroma_memory import NPCMemory, Turn
 from providers.router import ProviderRouter
 from schemas.actions import ChatRequest, ChatResponse, Speak
 

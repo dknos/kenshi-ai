@@ -16,6 +16,7 @@ namespace KenshiAI
     // ---------- IPC ----------------------------------------------------------
     // Non-blocking: spawns a thread, fires callback on completion.
     void PostChat(const std::string& requestJson, ResponseCallback cb);
+    void PostD2D(const std::string& requestJson, ResponseCallback cb);
 
     // ---------- Actions ------------------------------------------------------
     // Called from the main-thread queue drain in hooks.cpp.

@@ -96,3 +96,44 @@ class NPCMemory:
             documents=[text],
             metadatas=[{"tags": ",".join(tags), "ts": time.time()}],
         )
+
+    async def recent_turns(self, limit: int = 40) -> list[Turn]:
+        count = self._turns.count()
+        if count == 0:
+            return []
+        results = self._turns.get(
+            limit=min(limit, count),
+            include=["documents", "metadatas"],
+        )
+        turns: list[Turn] = []
+        for doc, meta in zip(results.get("documents", []), results.get("metadatas", [])):
+            turns.append(Turn(npc_id=meta["npc_id"], role=meta["role"], text=doc, ts=meta["ts"]))
+        turns.sort(key=lambda t: t.ts, reverse=True)
+        return turns
+
+    async def list_rumors(self, limit: int = 20) -> list[dict]:
+        count = self._rumors.count()
+        if count == 0:
+            return []
+        results = self._rumors.get(
+            limit=min(limit, count),
+            include=["documents", "metadatas"],
+        )
+        rumors = []
+        for doc_id, doc, meta in zip(
+            results.get("ids", []),
+            results.get("documents", []),
+            results.get("metadatas", []),
+        ):
+            if not meta.get("retired"):
+                rumors.append({"id": doc_id, "text": doc, "tags": meta.get("tags", "").split(",")})
+        return rumors
+
+    async def retire_rumor(self, rumor_id: str) -> None:
+        try:
+            self._rumors.update(
+                ids=[rumor_id],
+                metadatas=[{"retired": True}],
+            )
+        except Exception:
+            pass

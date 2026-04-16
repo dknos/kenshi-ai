@@ -12,6 +12,8 @@
 #include <kenshi/Globals.h>
 #include <kenshi/GameWorld.h>
 #include <kenshi/PlayerInterface.h>
+#include <kenshi/Faction.h>
+#include <kenshi/FactionRelations.h>
 
 #include "kenshi_ai.h"
 
@@ -71,10 +73,19 @@ namespace Actions
         }
 
         // ── faction_relation_delta ────────────────────────────────────────
-        if (resp.factionRelDelta != 0 && !resp.factionRelTarget.empty())
+        // Adjust npc-faction's standing toward player faction.
+        if (resp.factionRelDelta != 0)
         {
-            // FactionRelations::changeRelationsBy(Faction*, float delta)
-            // TODO: resolve faction by name from ou->factionList.
+            Faction* npcFaction = npc->getPlatoon() ? npc->getPlatoon()->getFaction() : nullptr;
+            Faction* playerFaction = (ou && ou->player) ? ou->player->getFaction() : nullptr;
+            if (npcFaction && playerFaction && npcFaction->factionRelations)
+            {
+                npcFaction->factionRelations->affectRelations(
+                    playerFaction,
+                    static_cast<float>(resp.factionRelDelta),
+                    1.0f
+                );
+            }
         }
     }
 }

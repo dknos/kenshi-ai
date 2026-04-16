@@ -1,3 +1,3 @@
-from .qdrant_memory import NPCMemory, Turn
+from .chroma_memory import NPCMemory, Turn
 
 __all__ = ["NPCMemory", "Turn"]

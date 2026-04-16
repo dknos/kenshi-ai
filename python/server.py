@@ -35,7 +35,6 @@ async def lifespan(app: FastAPI):
     router = ProviderRouter.from_config_dir()
     await router.__aenter__()
     memory = NPCMemory(
-        url=os.environ.get("QDRANT_URL", "http://127.0.0.1:6333"),
         campaign_id=os.environ.get("KENSHI_CAMPAIGN", "Default"),
     )
     await memory.connect()
@@ -48,8 +47,8 @@ async def lifespan(app: FastAPI):
     app.state.router = router
     app.state.memory = memory
     app.state.agent = ChatAgent(router, memory, default_model)
-    log.info("kenshi-ai sidecar ready. default_model=%s qdrant_online=%s",
-             default_model, memory._online)
+    log.info("kenshi-ai sidecar ready. default_model=%s campaign=%s",
+             default_model, memory.campaign_id)
     try:
         yield
     finally:
@@ -69,7 +68,7 @@ async def healthz() -> dict:
         "completion_tokens": t.total_completion_tokens,
         "usd_total": round(t.total_usd_cost, 5),
         "last_model": t.last_model,
-        "qdrant_online": app.state.memory._online,
+        "campaign": app.state.memory.campaign_id,
     }
 
 

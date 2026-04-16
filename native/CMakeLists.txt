@@ -35,7 +35,16 @@ target_include_directories(kenshi_ai PRIVATE
 )
 
 # Prevent Windows.h from defining min/max macros that clash with std::min/max
-target_compile_definitions(kenshi_ai PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+# UNICODE/_UNICODE: KenshiLib PerfTimer.h calls CreateMutex(L"") — needs wide version
+# _STLP_HASH_FUN_H: forces OgreString.h to use std::hash instead of removed std::tr1::hash
+# NOMINMAX/WIN32_LEAN_AND_MEAN: prevent min/max macro conflicts
+target_compile_definitions(kenshi_ai PRIVATE
+    NOMINMAX
+    WIN32_LEAN_AND_MEAN
+    UNICODE
+    _UNICODE
+    _STLP_HASH_FUN_H
+)
 
 target_link_libraries(kenshi_ai PRIVATE
     "${KENSHILIB_LIB}"

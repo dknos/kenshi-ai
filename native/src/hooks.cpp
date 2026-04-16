@@ -20,7 +20,10 @@
 #include <kenshi/Character.h>
 #include <kenshi/CharStats.h>
 #include <kenshi/Globals.h>
+#include <kenshi/GameWorld.h>
 #include <kenshi/PlayerInterface.h>
+#include <kenshi/Platoon.h>
+#include <kenshi/RaceData.h>
 #include <core/Functions.h>
 
 #include "kenshi_ai.h"

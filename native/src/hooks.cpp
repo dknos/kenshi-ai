@@ -28,6 +28,7 @@
 #include <core/Functions.h>
 
 #include "kenshi_ai.h"
+#include "input_dialog.h"
 
 #include <mutex>
 #include <queue>
@@ -83,6 +84,12 @@ namespace State
                                  const std::string& playerMessage);
 }
 
+// ── Active conversation tracking (set in startPlayerConversation) ─────────────
+
+static Dialogue*  g_activeDlg  = nullptr;
+static Character* g_activeNpc  = nullptr;
+static bool       g_f9WasDown  = false;
+
 // ── Hook originals ────────────────────────────────────────────────────────────
 
 static bool (*orig_startPlayerConversation)(Dialogue*, Character*, DialogLineData*) = nullptr;
@@ -101,6 +108,10 @@ static bool hook_startPlayerConversation(Dialogue* self,
 
     if (!result || !target)
         return result;
+
+    // Track active conversation for F9 input.
+    g_activeDlg = self;
+    g_activeNpc = target;
 
     // Grab the player character from PlayerInterface.
     Character* player = (ou && ou->player) ? ou->player->getAnyPlayerCharacter() : nullptr;
@@ -141,6 +152,33 @@ static bool hook_startPlayerConversation(Dialogue* self,
 static void hook_dialogueUpdate(Dialogue* self, float frameTime)
 {
     orig_dialogueUpdate(self, frameTime);
+
+    // F9: open player-input dialog when this is the active conversation.
+    if (self == g_activeDlg && g_activeNpc)
+    {
+        bool f9Down = (GetAsyncKeyState(VK_F9) & 0x8000) != 0;
+        if (f9Down && !g_f9WasDown)
+        {
+            Dialogue*  dlg    = g_activeDlg;
+            Character* npc    = g_activeNpc;
+            Character* player = (ou && ou->player) ? ou->player->getAnyPlayerCharacter() : nullptr;
+
+            InputDialog::Show([dlg, npc, player](const std::string& text)
+            {
+                std::string req = State::BuildChatRequest(npc, player, text);
+                KenshiAI::PostChat(req, [dlg, npc](const std::string& json)
+                {
+                    QueuedResponse qr;
+                    qr.dialogue  = dlg;
+                    qr.character = npc;
+                    qr.parsed    = KenshiAI::ParseResponse(json);
+                    std::lock_guard<std::mutex> lk(g_queueMutex);
+                    g_responseQueue.push(std::move(qr));
+                });
+            });
+        }
+        g_f9WasDown = f9Down;
+    }
 
     // Drain responses destined for this Dialogue instance.
     // We can't break on mismatches because std::queue is FIFO — a response for
@@ -285,5 +323,7 @@ namespace Hooks
         );
 
         g_radiantIntervalS = KenshiAI::g_config.radiantDelayS;
+
+        InputDialog::Init();
     }
 }

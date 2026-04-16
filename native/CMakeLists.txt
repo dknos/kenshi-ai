@@ -26,6 +26,7 @@ add_library(kenshi_ai SHARED
     src/state.cpp
     src/actions.cpp
     src/config.cpp
+    src/input_dialog.cpp
 )
 
 target_include_directories(kenshi_ai PRIVATE
